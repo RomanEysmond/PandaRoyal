@@ -5,20 +5,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -29,25 +33,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Убираем системную анимацию и стандартный сплэш
         overridePendingTransition(0, 0)
 
         setContent {
-            var showSplash by remember { mutableStateOf(true) }
-
-            if (showSplash) {
-                // Кастомный сплэш-экран
-                SplashScreen {
-                    showSplash = false
-                }
-            } else {
-                MaterialTheme {
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background
-                    ) {
-                        ScoringTableApp()
-                    }
+            MaterialTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = Color(0xFFF5F5F5)
+                ) {
+                    ScoringTableApp()
                 }
             }
         }
@@ -64,7 +58,11 @@ fun SplashScreen(onFinished: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White),
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF667eea), Color(0xFF764ba2))
+                )
+            ),
         contentAlignment = Alignment.Center
     ) {
         Image(
@@ -72,7 +70,7 @@ fun SplashScreen(onFinished: () -> Unit) {
             contentDescription = "Logo",
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(32.dp),
             contentScale = ContentScale.Fit
         )
     }
@@ -82,7 +80,6 @@ fun SplashScreen(onFinished: () -> Unit) {
 fun ScoringTableApp() {
     val rowNames = listOf("Раунд", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
 
-    // Названия столбцов
     val columnNames = listOf(
         "Раунд",
         "Сумма\nжёлт.",
@@ -94,37 +91,46 @@ fun ScoringTableApp() {
         "Розов."
     )
 
-    // Цвета ячеек
-    val columnBackgroundColors = listOf(
-        Color.White,
-        Color.Yellow,
-        Color(0xFFE1BEE7),
-        Color.Cyan,
-        Color.Red,
-        Color.Green,
-        Color.White,
-        Color(0xFFFFC0CB)
+    // Цвета для заголовков столбцов (100% непрозрачности)
+    val headerColumnColors = listOf(
+        Brush.horizontalGradient(listOf(Color(0xFFF5F5F5), Color(0xFFE0E0E0))),
+        Brush.horizontalGradient(listOf(Color(0xFFFFF176), Color(0xFFFFEE58))),
+        Brush.horizontalGradient(listOf(Color(0xFFCE93D8), Color(0xFFBA68C8))),
+        Brush.horizontalGradient(listOf(Color(0xFF80DEEA), Color(0xFF4DD0E1))),
+        Brush.horizontalGradient(listOf(Color(0xFFEF9A9A), Color(0xFFE57373))),
+        Brush.horizontalGradient(listOf(Color(0xFFA5D6A7), Color(0xFF81C784))),
+        Brush.horizontalGradient(listOf(Color(0xFFF5F5F5), Color(0xFFE0E0E0))),
+        Brush.horizontalGradient(listOf(Color(0xFFF48FB1), Color(0xFFF06292)))
+    )
+
+    // Цвета для ячеек данных (50% прозрачности)
+    val dataColumnColors = listOf(
+        Color(0xFFF5F5F5).copy(alpha = 0.5f),
+        Color(0xFFFFF176).copy(alpha = 0.5f),
+        Color(0xFFCE93D8).copy(alpha = 0.5f),
+        Color(0xFF80DEEA).copy(alpha = 0.5f),
+        Color(0xFFEF9A9A).copy(alpha = 0.5f),
+        Color(0xFFA5D6A7).copy(alpha = 0.5f),
+        Color(0xFFF5F5F5).copy(alpha = 0.5f),
+        Color(0xFFF48FB1).copy(alpha = 0.5f)
     )
 
     val rowCount = 11
     val colCount = 8
 
-    // Используем mutableStateMapOf для хранения данных с ключом Pair<row, col>
     val cellValues = remember {
         mutableStateMapOf<Pair<Int, Int>, String>()
     }
 
-    // Инициализация начальных значений при первом запуске
+    var selectedRound by remember { mutableStateOf<Int?>(null) }
+
     LaunchedEffect(Unit) {
-        // Заполняем заголовки столбцов (первая строка)
         for (col in 0 until colCount) {
             cellValues[Pair(0, col)] = columnNames[col]
         }
-        // Заполняем заголовки строк (первый столбец)
         for (row in 0 until rowCount) {
             cellValues[Pair(row, 0)] = rowNames[row]
         }
-        // Заполняем остальные ячейки пустыми строками
         for (row in 1 until rowCount) {
             for (col in 1 until colCount) {
                 if (cellValues[Pair(row, col)] == null) {
@@ -136,7 +142,15 @@ fun ScoringTableApp() {
 
     var showClearDialog by remember { mutableStateOf(false) }
 
-    // Функция для вычисления общей суммы всех чисел за все раунды
+    fun calculateRoundSum(round: Int): Int {
+        var total = 0
+        for (col in 1..7) {
+            val value = cellValues[Pair(round, col)]?.toIntOrNull() ?: 0
+            total += value
+        }
+        return total
+    }
+
     fun calculateGrandTotal(): Int {
         var total = 0
         for (row in 1..10) {
@@ -148,176 +162,300 @@ fun ScoringTableApp() {
         return total
     }
 
-    // Общая сумма всех очков - пересчитывается при каждом изменении
     val grandTotal = remember {
         derivedStateOf {
             calculateGrandTotal()
         }
     }
 
-    // Функция очистки таблицы
+    val selectedRoundSum = remember(selectedRound, cellValues) {
+        if (selectedRound != null) {
+            calculateRoundSum(selectedRound!!)
+        } else {
+            0
+        }
+    }
+
     fun clearTable() {
         for (row in 1..10) {
             for (col in 1..7) {
                 cellValues[Pair(row, col)] = ""
             }
         }
+        selectedRound = null
     }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(Color(0xFFF5F5F5))
+            .padding(0.dp)
     ) {
-        Column(
+        // Заголовок
+        Card(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(0.dp)
+                .fillMaxWidth()
+                .padding(12.dp)
+                .padding(top = 8.dp),
+            shape = RoundedCornerShape(12.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
-            Text(
-                text = "Таблица подсчёта очков",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                textAlign = TextAlign.Center,
-                color = Color.Black
-            )
-
-            // Закрепленная шапка таблицы (первая строка)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.LightGray)
-                    .border(0.5.dp, Color.Gray)
-            ) {
-                for (col in 0 until colCount) {
-                    val backgroundColor = columnBackgroundColors[col]
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(70.dp)
-                            .border(0.5.dp, Color.Gray)
-                            .background(backgroundColor)
-                            .padding(4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = columnNames[col],
-                            fontSize = 9.sp,
-                            textAlign = TextAlign.Center,
-                            color = Color.Black,
-                            fontWeight = FontWeight.Bold,
-                            lineHeight = 11.sp,
-                            maxLines = 4,
-                            overflow = TextOverflow.Visible
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(Color(0xFF667eea), Color(0xFF764ba2))
                         )
-                    }
-                }
+                    )
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "🎲 Таблица подсчёта очков",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
             }
+        }
 
-            // Прокручиваемая область с данными (строки 1-10)
+        // Таблица
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            shape = RoundedCornerShape(0.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
+                    .fillMaxSize()
+                    .background(Color.White)
             ) {
-                for (row in 1 until rowCount) {
-                    Row(
+                // Шапка таблицы
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    // Угловая ячейка с вертикальным текстом "Раунд"
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color.Transparent)
+                            .width(40.dp)
+                            .height(80.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color(0xFF667eea), Color(0xFF764ba2))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
-                        for (col in 0 until colCount) {
-                            val isEditable = col in 1..7
-                            val isFirstColumn = col == 0
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            listOf("Р", "А", "У", "Н", "Д").forEach { letter ->
+                                Text(
+                                    text = letter,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    letterSpacing = 1.sp
+                                )
+                            }
+                        }
+                    }
 
-                            val backgroundColor = Color.White
-
-                            val cellModifier = Modifier
+                    // Остальные заголовки столбцов
+                    for (col in 1 until colCount) {
+                        Box(
+                            modifier = Modifier
                                 .weight(1f)
-                                .height(50.dp)
-                                .border(0.5.dp, Color.Gray)
-                                .background(backgroundColor)
+                                .height(80.dp)
+                                .background(headerColumnColors[col]),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = columnNames[col],
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center,
+                                color = Color(0xFF333333),
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 13.sp,
+                                maxLines = 4,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
 
-                            val cellValue = cellValues[Pair(row, col)] ?: ""
+                // Прокручиваемая область с данными
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    for (row in 1 until rowCount) {
+                        val isSelected = selectedRound == row
 
-                            when {
-                                isFirstColumn -> {
-                                    Box(
-                                        modifier = cellModifier.padding(4.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = cellValue,
-                                            fontSize = 12.sp,
-                                            textAlign = TextAlign.Center,
-                                            color = Color.Black,
-                                            fontWeight = FontWeight.Normal
-                                        )
-                                    }
-                                }
-                                isEditable -> {
-                                    EditableCell(
-                                        value = cellValue,
-                                        onValueChange = { newValue ->
-                                            if (newValue.isEmpty() || newValue.all { it.isDigit() }) {
-                                                cellValues[Pair(row, col)] = newValue
-                                            }
-                                        },
-                                        modifier = cellModifier
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (isSelected) Color(0xFFE3F2FD).copy(alpha = 0.8f)
+                                    else Color.Transparent
+                                )
+                        ) {
+                            // Столбец с номерами раундов - без тени и скруглений
+                            Box(
+                                modifier = Modifier
+                                    .width(40.dp)
+                                    .height(56.dp)
+                                    .background(
+                                        if (isSelected) Color(0xFF2196F3)
+                                        else dataColumnColors[0]
                                     )
+                                    .clickable {
+                                        selectedRound = if (selectedRound == row) null else row
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = cellValues[Pair(row, 0)] ?: "",
+                                    fontSize = 14.sp,
+                                    textAlign = TextAlign.Center,
+                                    color = if (isSelected) Color.White else Color(0xFF333333),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            // Остальные столбцы с небольшой тенью
+                            for (col in 1 until colCount) {
+                                val isEditable = col in 1..7
+
+                                val cellValue = cellValues[Pair(row, col)] ?: ""
+
+                                if (isEditable) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(56.dp)
+                                            .padding(1.dp)
+                                    ) {
+                                        Card(
+                                            modifier = Modifier.fillMaxSize(),
+                                            shape = RoundedCornerShape(4.dp),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = dataColumnColors[col]
+                                            ),
+                                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                                        ) {
+                                            EditableCell(
+                                                value = cellValue,
+                                                onValueChange = { newValue ->
+                                                    if (newValue.isEmpty() || newValue.all { it.isDigit() }) {
+                                                        cellValues[Pair(row, col)] = newValue
+                                                    }
+                                                },
+                                                modifier = Modifier.fillMaxSize(),
+                                                backgroundColor = dataColumnColors[col]
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+        }
 
-            // Нижняя панель с итоговой суммой и кнопкой очистки
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .padding(8.dp)
+        // Нижняя панель
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFFF5F5F5))
+                .padding(12.dp)
+        ) {
+            // Карточка общей суммы
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFE8EAF6)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "💰 Общая сумма всех очков:",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF333333)
+                    )
+                    Text(
+                        text = grandTotal.value.toString(),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4CAF50)
+                    )
+                }
+            }
+
+            // Карточка суммы за выбранный раунд
+            if (selectedRound != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFFFF3E0)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
+                            .padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Общая сумма всех очков:",
+                            text = "🎯 Сумма за раунд $selectedRound:",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Black
+                            color = Color(0xFF333333)
                         )
                         Text(
-                            text = grandTotal.value.toString(),
-                            fontSize = 18.sp,
+                            text = selectedRoundSum.toString(),
+                            fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Black
+                            color = Color(0xFFFF9800)
                         )
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-                Button(
-                    onClick = { showClearDialog = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252))
-                ) {
-                    Text("Очистить таблицу", color = Color.White, fontSize = 15.sp)
-                }
+            Button(
+                onClick = { showClearDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFEF5350)
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+            ) {
+                Text("🗑️ Очистить таблицу", color = Color.White, fontSize = 16.sp)
             }
         }
     }
@@ -328,15 +466,11 @@ fun ScoringTableApp() {
             title = {
                 Text(
                     "Подтверждение очистки",
-                    color = Color.Black,
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
-                Text(
-                    "Вы уверены, что хотите очистить все данные таблицы?",
-                    color = Color.Black
-                )
+                Text("Вы уверены, что хотите очистить все данные таблицы?")
             },
             confirmButton = {
                 TextButton(
@@ -350,7 +484,7 @@ fun ScoringTableApp() {
             },
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) {
-                    Text("Отмена", color = Color.Black)
+                    Text("Отмена")
                 }
             }
         )
@@ -361,7 +495,8 @@ fun ScoringTableApp() {
 fun EditableCell(
     value: String,
     onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    backgroundColor: Color = Color.White
 ) {
     var localValue by remember(value) { mutableStateOf(value) }
 
@@ -372,29 +507,34 @@ fun EditableCell(
     TextField(
         value = localValue,
         onValueChange = { newValue ->
-            localValue = newValue
-            onValueChange(newValue)
+            // Разрешаем только цифры
+            if (newValue.isEmpty() || newValue.all { it.isDigit() }) {
+                localValue = newValue
+                onValueChange(newValue)
+            }
         },
         modifier = modifier,
         textStyle = TextStyle(
             textAlign = TextAlign.Center,
             fontSize = 13.sp,
-            color = Color.Black
+            color = Color(0xFF333333),
+            fontWeight = FontWeight.Medium
         ),
         placeholder = {
             Text(
                 "0",
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 textAlign = TextAlign.Center,
                 color = Color.Gray
             )
         },
         singleLine = true,
-        shape = RoundedCornerShape(0.dp),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        shape = RoundedCornerShape(0.dp), // Убираем скругления, чтобы было больше места
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
-            disabledContainerColor = Color.White,
+            focusedContainerColor = backgroundColor,
+            unfocusedContainerColor = backgroundColor,
+            disabledContainerColor = backgroundColor,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
             disabledIndicatorColor = Color.Transparent
