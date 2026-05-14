@@ -2,7 +2,6 @@
 <resources>
     <style name="Theme.ScoringTable" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@color/white</item>
-        <!-- Отключаем системный сплэш-экран -->
         <item name="android:windowDisablePreview">true</item>
         <item name="android:windowBackground">@null</item>
     </style>

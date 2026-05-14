@@ -3,6 +3,7 @@ package com.example.scoringtable
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -14,26 +15,66 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Убираем системную анимацию и стандартный сплэш
+        overridePendingTransition(0, 0)
+
         setContent {
-            MaterialTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    ScoringTableApp()
+            var showSplash by remember { mutableStateOf(true) }
+
+            if (showSplash) {
+                // Кастомный сплэш-экран
+                SplashScreen {
+                    showSplash = false
+                }
+            } else {
+                MaterialTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        ScoringTableApp()
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun SplashScreen(onFinished: () -> Unit) {
+    LaunchedEffect(Unit) {
+        delay(2000)
+        onFinished()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.logo),
+            contentDescription = "Logo",
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentScale = ContentScale.Fit
+        )
     }
 }
 
@@ -191,7 +232,7 @@ fun ScoringTableApp() {
                             .background(Color.Transparent)
                     ) {
                         for (col in 0 until colCount) {
-                            val isEditable = col in 1..7 // Все столбцы кроме первого
+                            val isEditable = col in 1..7
                             val isFirstColumn = col == 0
 
                             val backgroundColor = Color.White
@@ -206,7 +247,6 @@ fun ScoringTableApp() {
 
                             when {
                                 isFirstColumn -> {
-                                    // Первый столбец (номера раундов) - только текст
                                     Box(
                                         modifier = cellModifier.padding(4.dp),
                                         contentAlignment = Alignment.Center
@@ -221,7 +261,6 @@ fun ScoringTableApp() {
                                     }
                                 }
                                 isEditable -> {
-                                    // Редактируемые ячейки
                                     EditableCell(
                                         value = cellValue,
                                         onValueChange = { newValue ->
@@ -245,7 +284,6 @@ fun ScoringTableApp() {
                     .background(Color.White)
                     .padding(8.dp)
             ) {
-                // Карточка с итоговой суммой
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
