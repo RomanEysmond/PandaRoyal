@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
 fun ScoringTableApp() {
     val rowNames = listOf("Раунд", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
 
-    // Названия столбцов с символом суммы Σ
+    // Названия столбцов
     val columnNames = listOf(
         "Раунд",
         "Сумма\nжёлт.",
@@ -50,8 +50,7 @@ fun ScoringTableApp() {
         "Сумма красн.\nхКол. Красн.",
         "Сумма\nзелён.",
         "Сумма\nбелых",
-        "Розов.",
-        "Сумма\nза раунд"
+        "Розов."
     )
 
     // Цвета ячеек
@@ -63,12 +62,11 @@ fun ScoringTableApp() {
         Color.Red,
         Color.Green,
         Color.White,
-        Color(0xFFFFC0CB),
-        Color.White
+        Color(0xFFFFC0CB)
     )
 
     val rowCount = 11
-    val colCount = 9
+    val colCount = 8
 
     // Используем mutableStateMapOf для хранения данных с ключом Pair<row, col>
     val cellValues = remember {
@@ -97,18 +95,22 @@ fun ScoringTableApp() {
 
     var showClearDialog by remember { mutableStateOf(false) }
 
-    // Функция обновления сумм за раунд
-    fun updateRoundSums() {
+    // Функция для вычисления общей суммы всех чисел за все раунды
+    fun calculateGrandTotal(): Int {
+        var total = 0
         for (row in 1..10) {
-            var total = 0
             for (col in 1..7) {
                 val value = cellValues[Pair(row, col)]?.toIntOrNull() ?: 0
                 total += value
             }
-            val newValue = if (total > 0) total.toString() else ""
-            if (cellValues[Pair(row, 8)] != newValue) {
-                cellValues[Pair(row, 8)] = newValue
-            }
+        }
+        return total
+    }
+
+    // Общая сумма всех очков - пересчитывается при каждом изменении
+    val grandTotal = remember {
+        derivedStateOf {
+            calculateGrandTotal()
         }
     }
 
@@ -117,16 +119,6 @@ fun ScoringTableApp() {
         for (row in 1..10) {
             for (col in 1..7) {
                 cellValues[Pair(row, col)] = ""
-            }
-            cellValues[Pair(row, 8)] = ""
-        }
-    }
-
-    // Общая сумма всех раундов - пересчитывается при каждом изменении
-    val grandTotal = remember {
-        derivedStateOf {
-            (1..10).sumOf { row ->
-                cellValues[Pair(row, 8)]?.toIntOrNull() ?: 0
             }
         }
     }
@@ -152,70 +144,89 @@ fun ScoringTableApp() {
                 color = Color.Black
             )
 
+            // Закрепленная шапка таблицы (первая строка)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.LightGray)
+                    .border(0.5.dp, Color.Gray)
+            ) {
+                for (col in 0 until colCount) {
+                    val backgroundColor = columnBackgroundColors[col]
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(70.dp)
+                            .border(0.5.dp, Color.Gray)
+                            .background(backgroundColor)
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = columnNames[col],
+                            fontSize = 9.sp,
+                            textAlign = TextAlign.Center,
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 11.sp,
+                            maxLines = 4,
+                            overflow = TextOverflow.Visible
+                        )
+                    }
+                }
+            }
+
+            // Прокручиваемая область с данными (строки 1-10)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
             ) {
-                for (row in 0 until rowCount) {
+                for (row in 1 until rowCount) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(if (row == 0) Color.LightGray else Color.Transparent)
+                            .background(Color.Transparent)
                     ) {
                         for (col in 0 until colCount) {
-                            val isEditable = row in 1..10 && col in 1..7
-                            val isTotalColumn = col == 8
+                            val isEditable = col in 1..7 // Все столбцы кроме первого
                             val isFirstColumn = col == 0
-                            val isHeaderRow = row == 0
 
-                            val backgroundColor = if (isHeaderRow) {
-                                columnBackgroundColors[col]
-                            } else {
-                                Color.White
-                            }
+                            val backgroundColor = Color.White
 
                             val cellModifier = Modifier
                                 .weight(1f)
-                                .height(if (row == 0) 70.dp else 50.dp)
+                                .height(50.dp)
                                 .border(0.5.dp, Color.Gray)
                                 .background(backgroundColor)
 
-                            // Получаем текущее значение ячейки
                             val cellValue = cellValues[Pair(row, col)] ?: ""
 
                             when {
-                                isHeaderRow || isFirstColumn || isTotalColumn -> {
+                                isFirstColumn -> {
+                                    // Первый столбец (номера раундов) - только текст
                                     Box(
                                         modifier = cellModifier.padding(4.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = cellValue,
-                                            fontSize = when {
-                                                isHeaderRow -> 9.sp
-                                                isFirstColumn && row > 0 -> 12.sp
-                                                isTotalColumn -> 11.sp
-                                                else -> 12.sp
-                                            },
+                                            fontSize = 12.sp,
                                             textAlign = TextAlign.Center,
                                             color = Color.Black,
-                                            fontWeight = if (row == 0) FontWeight.Bold else FontWeight.Normal,
-                                            lineHeight = if (isHeaderRow) 11.sp else 16.sp,
-                                            maxLines = if (isHeaderRow) 4 else 1,
-                                            overflow = TextOverflow.Visible
+                                            fontWeight = FontWeight.Normal
                                         )
                                     }
                                 }
                                 isEditable -> {
-                                    // Отдельный компонент для редактируемой ячейки
+                                    // Редактируемые ячейки
                                     EditableCell(
                                         value = cellValue,
                                         onValueChange = { newValue ->
                                             if (newValue.isEmpty() || newValue.all { it.isDigit() }) {
                                                 cellValues[Pair(row, col)] = newValue
-                                                updateRoundSums()
                                             }
                                         },
                                         modifier = cellModifier
@@ -227,12 +238,14 @@ fun ScoringTableApp() {
                 }
             }
 
+            // Нижняя панель с итоговой суммой и кнопкой очистки
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.White)
                     .padding(8.dp)
             ) {
+                // Карточка с итоговой суммой
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
@@ -244,7 +257,7 @@ fun ScoringTableApp() {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Итоговая сумма за все раунды:",
+                            text = "Общая сумма всех очков:",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black
@@ -314,7 +327,6 @@ fun EditableCell(
 ) {
     var localValue by remember(value) { mutableStateOf(value) }
 
-    // Обновляем localValue при изменении value извне
     LaunchedEffect(value) {
         localValue = value
     }
